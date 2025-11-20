@@ -21,7 +21,7 @@
             background-color: #050505; /* Deeper black */
             color: #E5E7EB; /* Light gray text */
             min-height: 100vh;
-            padding: 4rem 2rem; /* Adjusted padding for better fit */
+            padding: 2rem 1rem; /* Adjusted padding for better mobile fit */
             overflow-x: hidden;
             position: relative;
         }
@@ -57,30 +57,30 @@
         /* Staggered Delay for subsequent cards */
         main section:nth-child(2).video-card { animation-delay: 0.2s; }
 
-        /* New Accent Color for Hover */
+        /* New Accent Color for Hover/Focus */
         .accent-color {
             color: #06B6D4; /* Bright Teal/Cyan Accent */
         }
 
         .video-card:hover {
             /* Deeper lift on hover */
-            transform: translateY(-8px);
+            transform: perspective(1000px) translateY(-8px);
             /* Sharp Glowing Shadow Effect using the new Cyan accent */
             box-shadow: 0 20px 40px rgba(6, 182, 212, 0.4), 0 0 15px rgba(6, 182, 212, 0.6);
             border-color: #06B6D4; /* Accent border on hover */
         }
-
+        
         /* VIDEO OVERLAY CONTAINER */
         .video-overlay-container {
             position: relative;
-            /* Added aspect ratio for consistent sizing */
             aspect-ratio: 16 / 9;
             background-color: #000;
             border-radius: 0.5rem;
             overflow: hidden;
+            cursor: pointer; /* Indicate it's clickable */
         }
 
-        /* VIDEO PLAYER STYLING - Hidden until hover, then opacity 1 */
+        /* VIDEO PLAYER STYLING - Hidden until played, then opacity 1 */
         .video-player {
             position: absolute;
             top: 0;
@@ -91,7 +91,7 @@
             opacity: 0; /* Initially hidden */
             transition: opacity 0.6s ease-in-out; /* Smooth reveal */
         }
-
+        
         /* TEXT OVERLAY (Covers video) */
         .card-overlay {
             position: absolute;
@@ -100,21 +100,22 @@
             width: 100%;
             height: 100%;
             padding: 1.5rem;
-            background-color: rgba(16, 16, 16, 0.95); /* Nearly opaque dark background */
-            transition: opacity 0.6s ease-in-out; /* Smooth fade for visibility */
-            /* Ensure text is above video */
+            background-color: rgba(16, 16, 16, 0.95);
+            transition: opacity 0.6s ease-in-out; 
             z-index: 20;
             display: flex;
             flex-direction: column;
             justify-content: center;
+            align-items: center;
+            text-align: center;
         }
-
-        /* Hide overlay and reveal video on card hover */
-        .video-overlay-container:hover .card-overlay {
+        
+        /* State when playing (CSS only for visual consistency) */
+        .is-playing .card-overlay {
             opacity: 0;
         }
-        .video-overlay-container:hover .video-player {
-            opacity: 1; /* Video revealed and plays */
+        .is-playing .video-player {
+            opacity: 1;
         }
 
         /* Ensure content stays above the 3D background */
@@ -130,7 +131,7 @@
                     colors: {
                         'primary-dark': '#050505',
                         'secondary-dark': '#101010',
-                        'accent-cyan': '#06B6D4', /* New Cyan Accent color */
+                        'accent-cyan': '#06B6D4',
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
@@ -145,6 +146,7 @@
             cardContainers.forEach(container => {
                 const card = container.querySelector('.video-card');
                 const video = container.querySelector('video');
+                const overlayContainer = container.querySelector('.video-overlay-container');
 
                 // --- 3D TILT EFFECT ---
                 const tiltEffect = (e) => {
@@ -153,7 +155,7 @@
                     const centerY = rect.top + rect.height / 2;
 
                     // Calculate rotation based on mouse position
-                    const rotateX = (e.clientY - centerY) / 20; // Max 7 deg tilt
+                    const rotateX = (e.clientY - centerY) / 20;
                     const rotateY = (e.clientX - centerX) / 20;
 
                     // Apply transformation
@@ -166,34 +168,48 @@
 
                 card.addEventListener('mousemove', tiltEffect);
                 card.addEventListener('mouseleave', resetTilt);
+                
+                // Reset tilt for mobile touches when lifting the finger
+                card.addEventListener('touchend', resetTilt);
 
-                // --- VIDEO PLAYBACK ON HOVER ---
-                const playVideo = () => {
-                    // Muted video can autoplay, bypassing user interaction error
-                    if (video) {
-                        video.play().catch(error => {
+
+                // --- VIDEO PLAYBACK ON CLICK/TAP ---
+                let isPlaying = false;
+
+                overlayContainer.addEventListener('click', () => {
+                    if (!isPlaying) {
+                        // Attempt to play (now with sound enabled)
+                        video.play().then(() => {
+                            isPlaying = true;
+                            overlayContainer.classList.add('is-playing');
+                        }).catch(error => {
+                            // This might still catch an error on first interaction,
+                            // but usually, a click satisfies the requirement.
                             console.error("Error playing video:", error);
+                            // If fails, revert state
+                            isPlaying = false;
+                            overlayContainer.classList.remove('is-playing');
                         });
-                    }
-                };
-
-                const pauseVideo = () => {
-                    if (video) {
+                    } else {
+                        // Pause the video and rewind
                         video.pause();
-                        // Rewind to start for clean loop on next hover
                         video.currentTime = 0;
+                        isPlaying = false;
+                        overlayContainer.classList.remove('is-playing');
                     }
-                };
-
-                // The video-overlay-container handles the hover to trigger both CSS (fade) and JS (play/pause)
-                container.addEventListener('mouseenter', playVideo);
-                container.addEventListener('mouseleave', pauseVideo);
+                });
+                
+                // Add an event listener to pause if the video ends normally
+                video.addEventListener('ended', () => {
+                    video.currentTime = 0;
+                    isPlaying = false;
+                    overlayContainer.classList.remove('is-playing');
+                });
             });
         });
 
-
         // --- THREE.JS BACKGROUND ANIMATION LOGIC ---
-        window.onload = function() {
+        window.addEventListener('load', function() {
             const container = document.getElementById('three-container');
             if (!container) return;
 
@@ -273,7 +289,7 @@
             }
 
             init();
-        }
+        });
     </script>
 </head>
 <body class="text-gray-100 min-h-screen">
@@ -281,27 +297,22 @@
     <!-- THREE.JS 3D Background Container -->
     <div id="three-container"></div>
 
-    <!-- Global Message Box (Instead of alert()) -->
-    <div id="message-box" class="hidden fixed top-5 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-xl z-50">
-        <span id="message-text"></span>
-    </div>
-
     <!-- Header Section -->
-    <header class="text-center mb-12 relative z-20 pt-16 sm:pt-20">
-        <h1 class="text-5xl font-extrabold tracking-tight accent-color mb-2 sm:text-6xl text-shadow-lg">
-            Project Showcase
+    <header class="text-center mb-10 relative z-20 pt-10 sm:pt-16">
+        <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight accent-color mb-2">
+            AI Project Showcase
         </h1>
-        <p class="text-lg text-gray-400">Deep Dives into VisuWeave and EcoVista</p>
+        <p class="text-base text-gray-400">Deep Dives into VisuWeave and EcoVista</p>
     </header>
 
     <!-- Main Content Grid -->
-    <main class="max-w-6xl mx-auto grid grid-cols-1 gap-10 lg:grid-cols-2 pb-16">
+    <main class="max-w-6xl mx-auto grid grid-cols-1 gap-8 lg:grid-cols-2 pb-16">
 
         <!-- PROJECT CARD 1: VisuWeave (Wrapper for 3D effect) -->
         <div class="video-card-container">
-            <section class="video-card p-6 rounded-xl">
+            <section class="video-card p-5 rounded-xl">
                 <!-- Project Title & Tech Stack (Always visible) -->
-                <h2 class="text-3xl font-bold text-gray-200 mb-2 flex items-center">
+                <h2 class="text-2xl font-bold text-gray-200 mb-2 flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 mr-3 accent-color"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
                     VisuWeave
                 </h2>
@@ -309,42 +320,34 @@
                     Python, ASR, NLP (BERT), GANs, RL
                 </p>
 
-                <!-- Video Player and Hover Overlay -->
-                <div class="video-overlay-container mb-6">
-                    <video controls preload="auto" class="video-player" muted>
-                        <!-- VisuWeave URL (Working): -->
+                <!-- Video Player and Click-to-Play Overlay -->
+                <div class="video-overlay-container">
+                    <video controls preload="auto" class="video-player">
                         <source src="https://raw.githubusercontent.com/UDAY2031/Project_demo/main/VisuWeave%20demo.mp4" type="video/mp4">
-                        <p class="text-center pt-8 text-gray-500">
-                            Video failed to load.
-                        </p>
                     </video>
 
-                    <!-- Overlay Text Content (Fades out on hover) -->
+                    <!-- Overlay Text Content (Fades out on click) -->
                     <div class="card-overlay rounded-lg">
-                        <h3 class="text-3xl font-bold text-gray-200 mb-4">Dynamic Presentation System</h3>
-                        <p class="text-gray-300 mb-4">
+                        <h3 class="text-2xl sm:text-3xl font-bold text-gray-200 mb-4">Dynamic Presentation System</h3>
+                        <p class="text-gray-300 mb-6 text-sm sm:text-base">
                             A real-time Speech-to-Visual mapping system. It utilizes cloud-based ASR for transcription and NLP models (like BERT) to extract critical phrases and context from live audio. This is followed by a pipeline leveraging AI image generation and web scraping to dynamically produce visuals and animated transitions in a GUI, ensuring visual coherence and minimal latency.
                         </p>
-                        <p class="text-gray-500 text-sm mt-2">
-                            *Move your cursor over this area to start the video demo (muted).*
+                        <div class="p-3 rounded-full bg-accent-cyan hover:bg-opacity-80 transition duration-300 shadow-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-900"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        </div>
+                        <p class="text-gray-500 text-xs sm:text-sm mt-3">
+                            Click or Tap to Play Demo
                         </p>
                     </div>
-                </div>
-
-                <!-- Actions - Always visible -->
-                <div class="mt-4">
-                    <a href="https://github.com/UDAY2031/Project_demo" target="_blank" class="w-full block text-center py-3 px-4 bg-gray-800 hover:bg-accent-cyan hover:text-gray-900 text-gray-200 font-semibold rounded-lg transition duration-200 shadow-md">
-                        View VisuWeave Code on GitHub
-                    </a>
                 </div>
             </section>
         </div>
 
         <!-- PROJECT CARD 2: EcoVista (Wrapper for 3D effect) -->
         <div class="video-card-container">
-            <section class="video-card p-6 rounded-xl">
+            <section class="video-card p-5 rounded-xl">
                 <!-- Project Title & Tech Stack (Always visible) -->
-                <h2 class="text-3xl font-bold text-gray-200 mb-2 flex items-center">
+                <h2 class="text-2xl font-bold text-gray-200 mb-2 flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 mr-3 accent-color"><path d="M7 19H4.857a2 2 0 0 1-1.995-1.851L2.003 4.152A2 2 0 0 1 4.01 2h15.98a2 2 0 0 1 2.007 2.152l-1.85 13.997A2 2 0 0 1 19.143 19H17"/><path d="M12 5V2"/><path d="M10 7L12 5L14 7"/><path d="M9 14h6"/><path d="M12 14v4"/></svg>
                     EcoVista
                 </h2>
@@ -352,33 +355,25 @@
                     Python, OpenCV, YOLOv8, IoT, CVAT
                 </p>
 
-                <!-- Video Player and Hover Overlay -->
-                <div class="video-overlay-container mb-6">
-                    <video controls preload="auto" class="video-player" muted>
-                        <!-- EcoVista URL (with fixes): -->
+                <!-- Video Player and Click-to-Play Overlay -->
+                <div class="video-overlay-container">
+                    <video controls preload="auto" class="video-player">
                         <source src="https://raw.githubusercontent.com/UDAY2031/Project_demo/main/EcoVista%20demo%202.mp4" type="video/mp4">
-                        <p class="text-center pt-8 text-gray-500">
-                            Video failed to load.
-                        </p>
                     </video>
 
-                    <!-- Overlay Text Content (Fades out on hover) -->
+                    <!-- Overlay Text Content (Fades out on click) -->
                     <div class="card-overlay rounded-lg">
-                        <h3 class="text-3xl font-bold text-gray-200 mb-4">AI-Driven Waste Segregation</h3>
-                        <p class="text-gray-300 mb-4">
+                        <h3 class="text-2xl sm:text-3xl font-bold text-gray-200 mb-4">AI-Driven Waste Segregation</h3>
+                        <p class="text-gray-300 mb-6 text-sm sm:text-base">
                             A comprehensive waste management solution with four modules: YOLO v8-based Segregation (dry, wet, recyclable, hazardous), CVAT-enhanced Litter Detection, a cost-effective Hardware Prototype using OpenCV for classification, and a User/Admin Application. The system includes an app-based reward system and surveillance monitoring to encourage proper disposal.
                         </p>
-                         <p class="text-gray-500 text-sm mt-2">
-                            *Move your cursor over this area to start the video demo (muted).*
+                        <div class="p-3 rounded-full bg-accent-cyan hover:bg-opacity-80 transition duration-300 shadow-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-900"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        </div>
+                        <p class="text-gray-500 text-xs sm:text-sm mt-3">
+                            Click or Tap to Play Demo
                         </p>
                     </div>
-                </div>
-
-                <!-- Actions - Always visible -->
-                <div class="mt-4">
-                    <a href="https://github.com/UDAY2031/EcoVista" target="_blank" class="w-full block text-center py-3 px-4 bg-gray-800 hover:bg-accent-cyan hover:text-gray-900 text-gray-200 font-semibold rounded-lg transition duration-200 shadow-md">
-                        View EcoVista Code on GitHub
-                    </a>
                 </div>
             </section>
         </div>
@@ -386,7 +381,7 @@
     </main>
 
     <!-- Footer -->
-    <footer class="mt-12 text-center text-gray-500 border-t border-gray-900 pt-6 relative z-20">
+    <footer class="mt-12 text-center text-gray-500 border-t border-gray-900 pt-6 relative z-20 max-w-6xl mx-auto">
         <p>Prepared for Your Interview | &copy; 2025</p>
         <p class="text-sm mt-1">Contact: <span class="accent-color">uday242004@gmail.com</span></p>
     </footer>
